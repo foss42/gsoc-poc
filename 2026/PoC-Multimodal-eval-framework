@@ -1,15 +1,22 @@
-## 🚀 Proof of Concept (PoC)
-
-To demonstrate the feasibility of the real-time streaming architecture, I have developed a functional Proof of Concept. This PoC integrates the FastAPI backend with the React frontend to handle live execution logs.
+###🚀 Proof of Concept (PoC) – Production-Grade Implementation
+To demonstrate the feasibility of the framework, I have developed a functional Proof of Concept that moves beyond static logs into a Bidirectional Agentic Workflow.
 
 **[▶️ Watch the PoC Demo Video on Google Drive](https://drive.google.com/file/d/1yU1CVqcSTt9s4fWjEeRO6JzHmB7sXRpY/view?usp=drive_link)**
 
-### **Technical Highlights of the PoC:**
-* **Real-Time Streaming:** Implemented **Server-Sent Events (SSE)** using FastAPI’s `StreamingResponse` to pipe live output from a Python subprocess directly to the UI.
-* **Terminal UI Component:** Developed a custom React/TypeScript terminal component that handles high-frequency data updates with 0% to 100% progress tracking.
-* **Architecture:** Proves the "dependency-lite" approach by avoiding heavy message brokers like Redis, ensuring the framework remains lightweight and portable.
+##Technical Highlights & AX (Agentic Experience):
+Interactive Evaluation Forms: Instead of relying on ambiguous text prompts, the PoC uses a Metric Selector UI (React). This allows users to deterministically select evaluation parameters (e.g., specific vision models, datasets, or latency thresholds), which are then serialized directly into the evaluation pipeline.
 
-### MCP Alignment Architecture
-​Standardized Tooling: "I will utilize MCP to standardize how the evaluation framework connects to external 'Multimodal Tools' (e.g., Vision-to-Text APIs, Audio Analysis tools)."
-​Agentic Testing: "By implementing an MCP-compatible server, the framework will be able to evaluate not just model outputs, but also the accuracy of tool-calls made by Agentic AI models."
-​Interoperability: "This ensures that any MCP-compatible model or agent can be plugged into the API Dash evaluation pipeline without custom glue code."
+Real-Time Data Hydration: Utilizing the ui/notifications/tool-input pattern, the UI is hydrated with structured JSON results from the evaluation engine. This avoids fragile string parsing and ensures a clean data flow from the FastAPI backend to the React charts.
+
+Streaming & Deployment Readiness: The PoC is built using Streamable HTTP transport, moving away from standard stdio to ensure the framework is "Remote-Ready." I have successfully Dockerized the environment to ensure a "one-click" setup for mentors, compatible with cloud runtimes like AWS Bedrock AgentCore.
+
+##🏗️ MCP Alignment Architecture
+Following the 2026 roadmap, the framework adopts the "Secure Sandbox" model described in the latest MCP App specifications to handle complex multimodal workflows.
+
+Deterministic Control via "App-Only" Tools: To prevent model hallucination during evaluation, I will implement Internal-Only Tools (_meta.ui.visibility: ["app"]). These tools are visible to the Eval UI but hidden from the LLM, ensuring that data-fetching and script-triggering are driven only by verified user interaction.
+
+Interactive Reporting & ui/download-file: The framework will go beyond on-screen results. By integrating jsPDF/jspdf-autotable, the framework will generate comprehensive PDF evaluation reports server-side. These will be surfaced via a PDF Viewer UI Resource, allowing users to save results locally using the standardized ui/download-file request.
+
+Enforced Security Contract (CSP): Every evaluation UI resource will include explicit Content Security Policy (CSP) metadata. This ensures that the host (API Dash) maintains strict control over which external domains (e.g., Chart.js CDNs or Model APIs) the framework can access, upholding the project’s "Security-First" philosophy.
+
+Standardized Lifecycle (Handshake): The framework will follow the full MCP handshake (ui/initialize). By inspecting hostCapabilities, the framework will dynamically enable or disable features like "Open Link" or "Clipboard Write" based on the environment it's running in (Desktop vs. Web).
