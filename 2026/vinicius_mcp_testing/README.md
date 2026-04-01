@@ -4,6 +4,8 @@
 > **GSoC 2026** — Vinícius Melo ([@vinimlo](https://github.com/vinimlo))
 > Proposal: [foss42/apidash#1476](https://github.com/foss42/apidash/pull/1476)
 
+[![asciicast](https://asciinema.org/a/KwA0DSejlBSzdYOe.svg)](https://asciinema.org/a/KwA0DSejlBSzdYOe)
+
 ## What This Is
 
 A protocol-first conformance testing engine that validates any MCP server — regardless of transport — against the [Model Context Protocol](https://modelcontextprotocol.io) specification.
