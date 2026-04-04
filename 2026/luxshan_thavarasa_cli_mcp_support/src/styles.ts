@@ -151,7 +151,11 @@ export const BASE_STYLES = `
   .tok-comment { color: #6a9955; }
 `;
 
-/** postMessage JSON-RPC bridge for MCP Apps iframe <-> host communication. */
+/**
+ * postMessage JSON-RPC bridge for MCP Apps iframe <-> host communication.
+ * Implements the MCP Apps protocol (2026-01-26) initialization handshake,
+ * tool-input/tool-result notifications, and auto-resize.
+ */
 export const MCP_COMMS_SCRIPT = `
   let _reqId = 0;
   const _pending = new Map();
@@ -170,9 +174,10 @@ export const MCP_COMMS_SCRIPT = `
 
   window.addEventListener('message', (e) => {
     const msg = e.data;
-    if (!msg || !msg.jsonrpc) return;
+    if (!msg || msg.jsonrpc !== '2.0') return;
 
-    if (msg.id && _pending.has(msg.id)) {
+    // Response to a pending request
+    if (msg.id !== undefined && _pending.has(msg.id)) {
       const { resolve, reject } = _pending.get(msg.id);
       _pending.delete(msg.id);
       if (msg.error) reject(msg.error);
@@ -180,19 +185,54 @@ export const MCP_COMMS_SCRIPT = `
       return;
     }
 
+    // Requests from host that need a response
+    if (msg.id !== undefined) {
+      if (msg.method === 'ping') {
+        window.parent.postMessage({ jsonrpc: '2.0', id: msg.id, result: {} }, '*');
+      } else if (msg.method === 'ui/resource-teardown') {
+        window.parent.postMessage({ jsonrpc: '2.0', id: msg.id, result: {} }, '*');
+      }
+      return;
+    }
+
+    // Notifications from host
     if (msg.method === 'ui/notifications/tool-input') {
       if (typeof onToolInput === 'function') onToolInput(msg.params);
+    } else if (msg.method === 'ui/notifications/tool-result') {
+      if (typeof onToolResult === 'function') onToolResult(msg.params);
+    } else if (msg.method === 'ui/notifications/tool-input-partial') {
+      if (typeof onToolInputPartial === 'function') onToolInputPartial(msg.params);
+    } else if (msg.method === 'ui/notifications/tool-cancelled') {
+      if (typeof onToolCancelled === 'function') onToolCancelled(msg.params);
+    } else if (msg.method === 'ui/notifications/host-context-changed') {
+      if (typeof onHostContextChanged === 'function') onHostContextChanged(msg.params);
     }
   });
 
   (async () => {
     try {
-      await sendRequest('ui/initialize', {
-        protocolVersion: '2025-11-21',
-        capabilities: {},
-        clientInfo: { name: 'apidash-mcp-app', version: '1.0.0' }
+      const result = await sendRequest('ui/initialize', {
+        appInfo: { name: 'API Dash MCP App', version: '1.0.0' },
+        appCapabilities: {},
+        protocolVersion: '2026-01-26'
       });
-      sendNotification('ui/notifications/initialized', {});
+      // Apply host style variables if provided
+      if (result && result.hostContext && result.hostContext.styles && result.hostContext.styles.variables) {
+        var vars = result.hostContext.styles.variables;
+        for (var key in vars) {
+          if (vars[key]) document.documentElement.style.setProperty(key, vars[key]);
+        }
+      }
+      sendNotification('ui/notifications/initialized');
+      // Auto-resize: notify host of size changes
+      var ro = new ResizeObserver(function() {
+        sendNotification('ui/notifications/size-changed', {
+          width: Math.ceil(window.innerWidth),
+          height: Math.ceil(document.documentElement.getBoundingClientRect().height)
+        });
+      });
+      ro.observe(document.documentElement);
+      ro.observe(document.body);
     } catch (_) {}
   })();
 `;

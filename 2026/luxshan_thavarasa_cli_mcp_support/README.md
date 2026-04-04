@@ -6,55 +6,77 @@ A TypeScript MCP server that exposes API Dash's core features as interactive **M
 
 ## Architecture
 
+```mermaid
+graph TD
+    User([User Prompt]) --> Client
+
+    subgraph Client["AI Chat Client (Claude Desktop / MCP Inspector)"]
+        direction LR
+        RB["Request Builder UI"]
+        RV["Response Viewer UI"]
+        CG["Code Generator UI"]
+    end
+
+    Client <-->|"stdio / HTTP"| Server
+
+    subgraph Server["API Dash MCP Server (Node.js)"]
+        direction TB
+
+        subgraph Resources["Resources (text/html · profile=mcp-app)"]
+            R1["request-builder-ui"]
+            R2["response-viewer-ui"]
+            R3["code-generator-ui"]
+        end
+
+        subgraph Tools
+            T1["build-api-request\n(model + app)"]
+            T2["execute-api-request\n(app only)"]
+            T3["visualize-api-response\n(model + app)"]
+            T4["generate-code-snippet\n(model + app)"]
+        end
+
+        Codegen["Code Generation\ncURL · Python · JS · Dart · Go"]
+    end
+
+    T2 -->|"fetch()"| API["External APIs\napi.apidash.dev"]
+    T4 --> Codegen
+
+    R1 -.- T1
+    R2 -.- T2
+    R2 -.- T3
+    R3 -.- T4
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                     AI Chat Client                               │
-│  (Claude Desktop, MCP Inspector, or any MCP Apps-capable host)   │
-│                                                                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐           │
-│  │  Request      │  │  Response    │  │  Code        │  MCP App  │
-│  │  Builder UI   │  │  Viewer UI   │  │  Generator UI│  iframes  │
-│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘           │
-│         │ postMessage      │ postMessage      │ postMessage      │
-│         │ (JSON-RPC)       │ (JSON-RPC)       │ (JSON-RPC)       │
-└─────────┼──────────────────┼──────────────────┼──────────────────┘
-          │                  │                  │
-          ▼                  ▼                  ▼
-┌──────────────────────────────────────────────────────────────────┐
-│                   API Dash MCP Server                            │
-│                                                                  │
-│  Resources (text/html;profile=mcp-app)                           │
-│  ├── request-builder-ui    Form with method/URL/params/body      │
-│  ├── response-viewer-ui    Status, headers, highlighted JSON     │
-│  └── code-generator-ui     Tabbed code viewer with copy          │
-│                                                                  │
-│  Tools                                                           │
-│  ├── build-api-request      [model+app]  Pre-populate builder    │
-│  ├── execute-api-request    [app]        Server-side HTTP fetch   │
-│  ├── visualize-api-response [model+app]  Render response data    │
-│  └── generate-code-snippet  [model+app]  5-language codegen      │
-│                                                                  │
-│  Transport: stdio (Claude Desktop) or HTTP (MCP Inspector)       │
-└──────────────────────────────────────────────────────────────────┘
-          │
-          ▼  fetch()
-┌──────────────────────┐
-│  External APIs       │
-│  api.apidash.dev     │
-│  (or any HTTP API)   │
-└──────────────────────┘
+
+### Data Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant AI as AI Model
+    participant S as MCP Server
+    participant API as External API
+
+    U->>AI: "Execute GET api.apidash.dev/country/data?code=US"
+    AI->>S: tools/call: execute-api-request
+    S->>API: GET /country/data?code=US
+    API-->>S: 200 OK + JSON body
+    S-->>AI: content (text) + structuredContent (data)
+    AI-->>U: Response: 200 OK, area: 9831510, population: 331893745
 ```
 
 ## How It Works
 
-1. **AI model calls a tool** (e.g., `execute-api-request`) based on user prompt
-2. **Server executes the HTTP request** server-side using Node.js `fetch()` — no CORS issues
-3. **Response is returned** as both `content` (text for the model) and `structuredContent` (data for the UI)
-4. **MCP App UI receives the data** via `postMessage` JSON-RPC and renders it interactively
+Each tool declares a `_meta.ui.resourceUri` pointing to an HTML resource. When the host calls the tool:
+
+1. **Host preloads the UI resource** — fetches the HTML from the `ui://` resource URI
+2. **AI model calls the tool** (e.g., `execute-api-request`) based on user prompt
+3. **Server executes** the tool logic (e.g., HTTP request via `fetch()`) and returns `content` + `structuredContent`
+4. **Host renders the UI** in a sandboxed iframe and pushes `structuredContent` via `postMessage` JSON-RPC
+5. **User interacts** with the UI — the iframe can call server tools back through the host
 
 Tool visibility controls who can call each tool:
 - **`[model+app]`** — AI model can invoke it, and the iframe UI can also call it
-- **`[app]`** — Only the iframe UI calls it (hidden from the AI model)
+- **`[app]`** --- Only the iframe UI calls it (hidden from the AI model)
 
 ## Setup
 
@@ -156,7 +178,7 @@ src/
 This PoC demonstrates the core concept from the CLI & MCP Support proposal:
 
 - **API Dash features as MCP tools** — request building, execution, visualization, codegen
-- **Interactive MCP Apps** — rich HTML UIs in sandboxed iframes, not just text
+- **Interactive MCP Apps** --- rich HTML UIs in sandboxed iframes, not just text
 - **Server-side HTTP execution** — avoids CORS, matches how the full Dart MCP server would work
 - **Multi-language codegen** — faithful ports of API Dash's Dart codegen templates
 - **Dual transport** — stdio for Claude Desktop, HTTP for MCP Inspector

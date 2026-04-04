@@ -240,9 +240,8 @@ export function requestBuilderUI(): string {
       }
     }
 
-    // ─── Tool input handler ─────────────────────
-    function onToolInput(params) {
-      const data = params?.structuredContent;
+    // ─── Populate form from data ────────────────
+    function populateForm(data) {
       if (!data) return;
       if (data.method) document.getElementById('methodSelect').value = data.method;
       if (data.url) document.getElementById('urlInput').value = data.url;
@@ -256,6 +255,16 @@ export function requestBuilderUI(): string {
         document.getElementById('headersRows').innerHTML = '';
         Object.entries(data.headers).forEach(([k, v]) => addKvRow('headersRows', k, v));
       }
+    }
+
+    // Tool input: receives tool call arguments before execution
+    function onToolInput(params) {
+      populateForm(params?.arguments);
+    }
+
+    // Tool result: receives structuredContent after execution (resolved presets)
+    function onToolResult(params) {
+      populateForm(params?.structuredContent);
     }
 
     // Start with one empty row each

@@ -1,4 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { registerAppTool, registerAppResource, RESOURCE_MIME_TYPE } from "@modelcontextprotocol/ext-apps/server";
+import type { CallToolResult, ReadResourceResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 
 import { requestBuilderUI } from "./ui/request-builder.js";
@@ -7,7 +9,6 @@ import { codeGeneratorUI } from "./ui/code-generator.js";
 import { generateAllSnippets } from "./utils/codegen.js";
 import { SAMPLE_REQUESTS } from "./data/sample-requests.js";
 
-const MIME = "text/html;profile=mcp-app";
 const URI = "ui://apidash-mcp-apps";
 
 /** Creates and configures the MCP server with all resources and tools. */
@@ -16,38 +17,54 @@ export function createServer(): McpServer {
 
   // ─── Resources (MCP App UIs) ────────────────────────────────
 
-  server.resource(
-    "request-builder-ui", `${URI}/request-builder-ui`,
-    { mimeType: MIME, description: "Interactive API request builder with method selector, URL input, headers/params/body tabs, and preset selector." },
-    async (uri) => ({ contents: [{ uri: uri.href, mimeType: MIME, text: requestBuilderUI() }] })
+  registerAppResource(
+    server,
+    "request-builder-ui",
+    `${URI}/request-builder`,
+    { description: "Interactive API request builder with method selector, URL input, headers/params/body tabs, and preset selector." },
+    async (): Promise<ReadResourceResult> => ({
+      contents: [{ uri: `${URI}/request-builder`, mimeType: RESOURCE_MIME_TYPE, text: requestBuilderUI() }],
+    })
   );
 
-  server.resource(
-    "response-viewer-ui", `${URI}/response-viewer-ui`,
-    { mimeType: MIME, description: "HTTP response viewer with status badge, headers table, syntax-highlighted JSON body, and timing/size cards." },
-    async (uri) => ({ contents: [{ uri: uri.href, mimeType: MIME, text: responseViewerUI() }] })
+  registerAppResource(
+    server,
+    "response-viewer-ui",
+    `${URI}/response-viewer`,
+    { description: "HTTP response viewer with status badge, headers table, syntax-highlighted JSON body, and timing/size cards." },
+    async (): Promise<ReadResourceResult> => ({
+      contents: [{ uri: `${URI}/response-viewer`, mimeType: RESOURCE_MIME_TYPE, text: responseViewerUI() }],
+    })
   );
 
-  server.resource(
-    "code-generator-ui", `${URI}/code-generator-ui`,
-    { mimeType: MIME, description: "Code snippet viewer with tabbed language selector (cURL, Python, JS, Dart, Go) and copy button." },
-    async (uri) => ({ contents: [{ uri: uri.href, mimeType: MIME, text: codeGeneratorUI() }] })
+  registerAppResource(
+    server,
+    "code-generator-ui",
+    `${URI}/code-generator`,
+    { description: "Code snippet viewer with tabbed language selector (cURL, Python, JS, Dart, Go) and copy button." },
+    async (): Promise<ReadResourceResult> => ({
+      contents: [{ uri: `${URI}/code-generator`, mimeType: RESOURCE_MIME_TYPE, text: codeGeneratorUI() }],
+    })
   );
 
   // ─── Tools ──────────────────────────────────────────────────
 
-  server.tool(
+  registerAppTool(
+    server,
     "build-api-request",
-    "Open the request builder UI pre-populated with the given parameters.",
     {
-      method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).optional().describe("HTTP method"),
-      url: z.string().optional().describe("Request URL"),
-      queryParams: z.record(z.string()).optional().describe("Query parameters"),
-      headers: z.record(z.string()).optional().describe("HTTP headers"),
-      body: z.string().optional().describe("Request body (JSON)"),
-      preset: z.string().optional().describe("Preset name: " + SAMPLE_REQUESTS.map((r) => `"${r.name}"`).join(", ")),
+      description: "Open the request builder UI pre-populated with the given parameters.",
+      inputSchema: {
+        method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).optional().describe("HTTP method"),
+        url: z.string().optional().describe("Request URL"),
+        queryParams: z.record(z.string()).optional().describe("Query parameters"),
+        headers: z.record(z.string()).optional().describe("HTTP headers"),
+        body: z.string().optional().describe("Request body (JSON)"),
+        preset: z.string().optional().describe("Preset name: " + SAMPLE_REQUESTS.map((r) => `"${r.name}"`).join(", ")),
+      },
+      _meta: { ui: { resourceUri: `${URI}/request-builder` } },
     },
-    async (args) => {
+    async (args): Promise<CallToolResult> => {
       let method = args.method || "GET";
       let url = args.url || "";
       let queryParams = args.queryParams;
@@ -68,22 +85,25 @@ export function createServer(): McpServer {
       return {
         content: [{ type: "text" as const, text: `Request builder: ${method} ${url || "(empty)"}` }],
         structuredContent: { method, url, queryParams, headers, body },
-        _meta: { ui: { resourceUri: `${URI}/request-builder-ui`, visibility: ["model", "app"] } },
       };
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "execute-api-request",
-    "Execute an HTTP request server-side (avoids CORS) and return the full response.",
     {
-      method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).describe("HTTP method"),
-      url: z.string().url().describe("Request URL"),
-      queryParams: z.record(z.string()).optional().describe("Query parameters"),
-      headers: z.record(z.string()).optional().describe("HTTP headers"),
-      body: z.string().optional().describe("Request body"),
+      description: "Execute an HTTP request server-side (avoids CORS) and return the full response.",
+      inputSchema: {
+        method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).describe("HTTP method"),
+        url: z.string().url().describe("Request URL"),
+        queryParams: z.record(z.string()).optional().describe("Query parameters"),
+        headers: z.record(z.string()).optional().describe("HTTP headers"),
+        body: z.string().optional().describe("Request body"),
+      },
+      _meta: { ui: { resourceUri: `${URI}/response-viewer`, visibility: ["app"] as const } },
     },
-    async (args) => {
+    async (args): Promise<CallToolResult> => {
       const startTime = Date.now();
       try {
         const urlObj = new URL(args.url);
@@ -117,7 +137,6 @@ export function createServer(): McpServer {
         return {
           content: [{ type: "text" as const, text: `${args.method} ${urlObj} → ${response.status} ${response.statusText} (${duration}ms)` }],
           structuredContent: result,
-          _meta: { ui: { resourceUri: `${URI}/response-viewer-ui`, visibility: ["app"] } },
         };
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
@@ -130,47 +149,53 @@ export function createServer(): McpServer {
     }
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "visualize-api-response",
-    "Render response data in the response viewer UI with status badge, headers, and highlighted body.",
     {
-      statusCode: z.number().describe("HTTP status code"),
-      statusText: z.string().optional().describe("Status text"),
-      headers: z.record(z.string()).optional().describe("Response headers"),
-      body: z.unknown().describe("Response body"),
-      duration: z.number().optional().describe("Duration in ms"),
-      url: z.string().optional().describe("Request URL"),
-      method: z.string().optional().describe("HTTP method"),
+      description: "Render response data in the response viewer UI with status badge, headers, and highlighted body.",
+      inputSchema: {
+        statusCode: z.number().describe("HTTP status code"),
+        statusText: z.string().optional().describe("Status text"),
+        headers: z.record(z.string()).optional().describe("Response headers"),
+        body: z.unknown().describe("Response body"),
+        duration: z.number().optional().describe("Duration in ms"),
+        url: z.string().optional().describe("Request URL"),
+        method: z.string().optional().describe("HTTP method"),
+      },
+      _meta: { ui: { resourceUri: `${URI}/response-viewer` } },
     },
-    async (args) => ({
+    async (args): Promise<CallToolResult> => ({
       content: [{ type: "text" as const, text: `Response: ${args.statusCode} ${args.statusText || ""} ${args.url ? `from ${args.method || ""} ${args.url}` : ""}`.trim() }],
       structuredContent: {
         statusCode: args.statusCode, statusText: args.statusText || "",
         headers: args.headers || {}, body: args.body,
         duration: args.duration, url: args.url, method: args.method,
       },
-      _meta: { ui: { resourceUri: `${URI}/response-viewer-ui`, visibility: ["model", "app"] } },
     })
   );
 
-  server.tool(
+  registerAppTool(
+    server,
     "generate-code-snippet",
-    "Generate code snippets in cURL, Python, JavaScript, Dart, and Go for a given API request.",
     {
-      method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).describe("HTTP method"),
-      url: z.string().describe("Request URL"),
-      queryParams: z.record(z.string()).optional().describe("Query parameters"),
-      headers: z.record(z.string()).optional().describe("HTTP headers"),
-      body: z.string().optional().describe("Request body"),
+      description: "Generate code snippets in cURL, Python, JavaScript, Dart, and Go for a given API request.",
+      inputSchema: {
+        method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"]).describe("HTTP method"),
+        url: z.string().describe("Request URL"),
+        queryParams: z.record(z.string()).optional().describe("Query parameters"),
+        headers: z.record(z.string()).optional().describe("HTTP headers"),
+        body: z.string().optional().describe("Request body"),
+      },
+      _meta: { ui: { resourceUri: `${URI}/code-generator` } },
     },
-    async (args) => {
+    async (args): Promise<CallToolResult> => {
       const snippets = generateAllSnippets(args);
       const text = snippets.map((s) => `### ${s.label}\n\`\`\`${s.language}\n${s.code}\n\`\`\``).join("\n\n");
 
       return {
         content: [{ type: "text" as const, text: `Code snippets for ${args.method} ${args.url} (${snippets.length} languages):\n\n${text}` }],
         structuredContent: { request: args, snippets },
-        _meta: { ui: { resourceUri: `${URI}/code-generator-ui`, visibility: ["model", "app"] } },
       };
     }
   );

@@ -200,8 +200,8 @@ export function codeGeneratorUI(): string {
       });
     }
 
-    // Handle incoming tool input
-    function onToolInput(params) {
+    // Tool result: receives structuredContent with code snippets
+    function onToolResult(params) {
       const data = params?.structuredContent;
       if (data) renderSnippets(data);
     }

@@ -257,8 +257,8 @@ export function responseViewerUI(): string {
       });
     }
 
-    // Handle incoming tool input (response data from execute-api-request)
-    function onToolInput(params) {
+    // Tool result: receives structuredContent with response data
+    function onToolResult(params) {
       const data = params?.structuredContent;
       if (data) renderResponse(data);
     }

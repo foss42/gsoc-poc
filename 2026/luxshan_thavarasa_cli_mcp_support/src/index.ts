@@ -9,7 +9,6 @@ import crypto from "crypto";
 import { createServer } from "./server.js";
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
-const server = createServer();
 const sessions = new Map<string, StreamableHTTPServerTransport>();
 
 const app = express();
@@ -38,6 +37,8 @@ app.post("/mcp", async (req, res) => {
       if (sid) sessions.delete(sid);
     };
 
+    // Each session gets its own server instance
+    const server = createServer();
     await server.connect(transport);
     await transport.handleRequest(req, res, req.body);
 
