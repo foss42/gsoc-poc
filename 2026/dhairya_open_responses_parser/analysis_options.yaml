@@ -1,0 +1,13 @@
+include: package:lints/recommended.yaml
+
+analyzer:
+  errors:
+    missing_required_param: error
+    missing_return: error
+
+linter:
+  rules:
+    - prefer_const_constructors
+    - prefer_final_fields
+    - avoid_print
+    - always_declare_return_types
