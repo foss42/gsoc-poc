@@ -1,0 +1,14 @@
+name: open_responses_parser
+description: >
+  Typed Dart parser for OpenAI Responses API payloads. Converts raw JSON maps
+  into structured domain objects with call-output correlation. GSoC 2026 POC
+  for API Dash (foss42/apidash).
+version: 0.1.0
+repository: https://github.com/dhairyajangir/open-responses-parser
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dev_dependencies:
+  test: ^1.24.0
+  lints: ^3.0.0
