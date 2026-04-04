@@ -3,19 +3,24 @@
 **GSoC 2026 · API Dash · Multimodal AI and Agent API Evaluation Framework**
 
 ## 🎬 Demo
-👉 https://youtu.be/FawtOMIb_pA
+
+👉 https://youtu.be/jxZyAHhV2Wk
 
 ## PoC Repository
-👉 https://github.com/MohidNaghman1/eval-mcp-poc
+
+👉 https://github.com/MohidNaghman1/POC_Ai-Models-Eval_Gsoc
 
 ## What This Builds
-Multi-provider LLM evaluation (Groq + Gemini + Mistral) with:
+
+Multi-provider LLM evaluation (Groq + Mistral) with:
+
 - Concurrent asyncio execution
-- BLEU + Exact Match metrics  
+- BLEU + ROUGE-L + Exact Match metrics
 - MCP Apps chat widget integration
 - CSV upload → evaluate → export pipeline
 
 ## Run Locally
+
 ```bash
 pip install -r backend/requirements.txt
 cp .env.example .env
