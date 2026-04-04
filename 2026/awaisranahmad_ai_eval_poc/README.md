@@ -1,8 +1,12 @@
 # AI Model Evaluation Framework — MCP Apps PoC
 
+
 **GSoC 2026 Proof of Concept**
+
 **Student:** Rana Awais Ahmad
+
 **Project:** End-to-End Multimodal AI & Agent Evaluation Framework
+
 **Mentor:** @animator
 
 ---
