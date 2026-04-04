@@ -1,0 +1,41 @@
+# Environment — never commit real credentials
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# Runtime artifacts (DB, uploaded files)
+poc/backend/runtime/eval.db
+runtime/eval.db
+runtime/artifacts/
+
+# Node / Frontend
+node_modules/
+dist/
+.next/
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# lm-eval output
+lm_eval_results/
+
+# Logs
+*.log
