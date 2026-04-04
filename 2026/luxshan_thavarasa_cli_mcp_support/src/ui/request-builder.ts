@@ -1,8 +1,3 @@
-/**
- * Request Builder MCP App UI.
- * Interactive form for building API requests with method, URL, headers, params, body.
- */
-
 import { BASE_STYLES, MCP_COMMS_SCRIPT } from "../styles.js";
 import { SAMPLE_REQUESTS } from "../data/sample-requests.js";
 

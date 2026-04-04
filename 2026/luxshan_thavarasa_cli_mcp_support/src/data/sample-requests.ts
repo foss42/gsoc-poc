@@ -10,7 +10,6 @@ export interface SampleRequest {
   bodyContentType?: string;
 }
 
-/** Preset requests sourced from API Dash test suite (api.apidash.dev endpoints). */
 export const SAMPLE_REQUESTS: SampleRequest[] = [
   {
     name: "Basic GET",

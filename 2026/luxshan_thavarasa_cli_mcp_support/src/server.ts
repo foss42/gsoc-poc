@@ -11,7 +11,6 @@ import { SAMPLE_REQUESTS } from "./data/sample-requests.js";
 
 const URI = "ui://apidash-mcp-apps";
 
-/** Creates and configures the MCP server with all resources and tools. */
 export function createServer(): McpServer {
   const server = new McpServer({ name: "apidash-mcp-apps", version: "1.0.0" });
 

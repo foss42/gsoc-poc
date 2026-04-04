@@ -1,8 +1,3 @@
-/**
- * HTTP transport entry point.
- * Serves the MCP server over Express with session-based Streamable HTTP.
- */
-
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import express from "express";
 import crypto from "crypto";

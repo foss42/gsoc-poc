@@ -1,8 +1,3 @@
-/**
- * Stdio transport entry point.
- * Used by Claude Desktop and other stdio-based MCP clients.
- */
-
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { createServer } from "./server.js";
 

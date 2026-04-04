@@ -1,9 +1,3 @@
-/**
- * Response Viewer MCP App UI.
- * Displays HTTP response with status badge, headers table, highlighted JSON body,
- * and timing/size info cards.
- */
-
 import { BASE_STYLES, MCP_COMMS_SCRIPT } from "../styles.js";
 
 export function responseViewerUI(): string {

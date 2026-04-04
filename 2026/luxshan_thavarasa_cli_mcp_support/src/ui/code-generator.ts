@@ -1,8 +1,3 @@
-/**
- * Code Generator MCP App UI.
- * Tabbed language selector with syntax-highlighted code blocks and copy button.
- */
-
 import { BASE_STYLES, MCP_COMMS_SCRIPT } from "../styles.js";
 
 export function codeGeneratorUI(): string {

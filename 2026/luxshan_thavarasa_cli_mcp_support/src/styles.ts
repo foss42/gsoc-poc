@@ -151,11 +151,6 @@ export const BASE_STYLES = `
   .tok-comment { color: #6a9955; }
 `;
 
-/**
- * postMessage JSON-RPC bridge for MCP Apps iframe <-> host communication.
- * Implements the MCP Apps protocol (2026-01-26) initialization handshake,
- * tool-input/tool-result notifications, and auto-resize.
- */
 export const MCP_COMMS_SCRIPT = `
   let _reqId = 0;
   const _pending = new Map();
