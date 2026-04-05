@@ -1,13 +1,19 @@
 # AI Model Playground (GSoC PoC)
 
-Repository Link:
+## Name
+Nitin Rathore
+
+## Repository
 https://github.com/tech-nitin/ai-model-playground
 
+## Live Demo
+https://ai-model-playground-zeta.vercel.app/
+
 ## Description
-This PoC demonstrates improvements in AI model selection, error handling, and user feedback.
+A full-stack AI playground supporting multiple LLMs using OpenRouter API.
 
 ## Features
-- Model selection with fallback handling
-- Input validation and error messages
+- Multi-model support (GPT, Mistral, Gemini)
+- Error handling and validation
 - Loading indicators
-- Clean UI with improved UX
+- Clean and responsive UI
