@@ -20,6 +20,18 @@ class _ModelConfigScreenState extends ConsumerState<ModelConfigScreen> {
   int _maxTokens = 256;
   String _provider = 'openai';
 
+  void _onProviderChanged(String provider) {
+    setState(() {
+      _provider = provider;
+      if (provider == 'huggingface') {
+        _baseUrlCtrl.text = 'https://router.huggingface.co/v1';
+      } else if (_baseUrlCtrl.text.trim().isEmpty ||
+          _baseUrlCtrl.text.trim() == 'https://router.huggingface.co/v1') {
+        _baseUrlCtrl.text = 'https://api.openai.com/v1';
+      }
+    });
+  }
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -130,6 +142,10 @@ class _ModelConfigScreenState extends ConsumerState<ModelConfigScreen> {
                             child: Text('OpenAI'),
                           ),
                           DropdownMenuItem(
+                            value: 'huggingface',
+                            child: Text('Hugging Face Router'),
+                          ),
+                          DropdownMenuItem(
                             value: 'ollama',
                             child: Text('Ollama'),
                           ),
@@ -142,8 +158,9 @@ class _ModelConfigScreenState extends ConsumerState<ModelConfigScreen> {
                             child: Text('Local Server'),
                           ),
                         ],
-                        onChanged: (v) =>
-                            setState(() => _provider = v ?? 'openai'),
+                        onChanged: (v) {
+                          _onProviderChanged(v ?? 'openai');
+                        },
                       ),
                       const SizedBox(height: 16),
                       TextFormField(

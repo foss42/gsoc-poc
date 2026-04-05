@@ -7,7 +7,7 @@ import '../models/evaluation.dart';
 import '../models/benchmark.dart';
 
 class ApiService {
-  static const String baseUrl = 'http://127.0.0.1:8000/api';
+  static const String baseUrl = 'http://127.0.0.1:9000/api';
 
   final Dio _dio = Dio(
     BaseOptions(
@@ -68,16 +68,22 @@ class ApiService {
     String baseUrl = 'https://api.openai.com/v1',
     bool supportsVision = false,
   }) async {
+    final normalizedProvider = provider.trim().toLowerCase();
+    final resolvedBaseUrl =
+        (normalizedProvider == 'huggingface' && baseUrl.trim().isEmpty)
+        ? 'https://router.huggingface.co/v1'
+        : baseUrl;
+
     final response = await _dio.post(
       '/models',
       data: {
         'name': name,
-        'provider': provider,
+        'provider': normalizedProvider,
         'api_key': apiKey,
         'model_name': modelName,
         'temperature': temperature,
         'max_tokens': maxTokens,
-        'base_url': baseUrl,
+        'base_url': resolvedBaseUrl,
         'supports_vision': supportsVision,
       },
     );
@@ -100,10 +106,7 @@ class ApiService {
       '/evaluations/$runId/stream',
       options: Options(
         responseType: ResponseType.stream,
-        headers: {
-          'Accept': 'text/event-stream',
-          'Cache-Control': 'no-cache',
-        },
+        headers: {'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'},
       ),
     );
 
@@ -116,7 +119,7 @@ class ApiService {
       if (line.startsWith('data: ')) {
         final jsonStr = line.substring(6).trim();
         if (jsonStr.isEmpty) continue;
-        
+
         try {
           final data = jsonDecode(jsonStr);
           if (data.containsKey('error')) continue;
@@ -199,33 +202,30 @@ class ApiService {
   }
 
   Stream<BenchmarkRun> streamBenchmark(String runId) async* {
-      final response = await _dio.get<ResponseBody>(
-        '/benchmarks/$runId/stream',
-        options: Options(
-          responseType: ResponseType.stream,
-          receiveTimeout: const Duration(minutes: 30),
-          headers: {
-            'Accept': 'text/event-stream',
-            'Cache-Control': 'no-cache',
-          },
-        ),
-      );
+    final response = await _dio.get<ResponseBody>(
+      '/benchmarks/$runId/stream',
+      options: Options(
+        responseType: ResponseType.stream,
+        receiveTimeout: const Duration(minutes: 30),
+        headers: {'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'},
+      ),
+    );
 
-      final stream = response.data!.stream
-          .cast<List<int>>()
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
+    final stream = response.data!.stream
+        .cast<List<int>>()
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
 
-      await for (final line in stream) {
-        if (line.startsWith('data: ')) {
-          final jsonStr = line.substring(6).trim();
-          if (jsonStr.isEmpty) continue;
+    await for (final line in stream) {
+      if (line.startsWith('data: ')) {
+        final jsonStr = line.substring(6).trim();
+        if (jsonStr.isEmpty) continue;
 
-          try {
-            final data = jsonDecode(jsonStr);
+        try {
+          final data = jsonDecode(jsonStr);
           if (data.containsKey('error')) continue;
-            yield BenchmarkRun.fromJson(data);
-          } catch (e) {
+          yield BenchmarkRun.fromJson(data);
+        } catch (e) {
           // Silent catch
         }
       }
@@ -256,4 +256,3 @@ class ApiService {
     await _dio.put('/settings/$key', data: {'value': value});
   }
 }
-

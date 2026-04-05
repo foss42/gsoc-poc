@@ -27,6 +27,17 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
   bool _applyChatTemplate = true;
   bool _fewshotAsMultiturn = true;
 
+  bool _isHuggingFaceRouterModel(List<dynamic> models) {
+    if (_selectedModelId == null) return false;
+    final match = models.where((m) => m.id == _selectedModelId);
+    if (match.isEmpty) return false;
+    final selected = match.first;
+    final provider = selected.provider.toString().toLowerCase();
+    final baseUrl = selected.baseUrl.toString().toLowerCase();
+    return provider == 'huggingface' ||
+        baseUrl.contains('router.huggingface.co');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -66,8 +77,10 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
           children: [
             Icon(Icons.key, color: AppTheme.secondary, size: 22),
             SizedBox(width: 8),
-            Text('HuggingFace Token',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(
+              'HuggingFace Token',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
           ],
         ),
         content: SizedBox(
@@ -114,9 +127,11 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
           setState(() => _hfTokenSet = result.isNotEmpty);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(result.isNotEmpty
-                  ? 'HuggingFace token saved'
-                  : 'HuggingFace token cleared'),
+              content: Text(
+                result.isNotEmpty
+                    ? 'HuggingFace token saved'
+                    : 'HuggingFace token cleared',
+              ),
               backgroundColor: AppTheme.success,
             ),
           );
@@ -125,8 +140,9 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-                content: Text('Failed to save token: $e'),
-                backgroundColor: AppTheme.error),
+              content: Text('Failed to save token: $e'),
+              backgroundColor: AppTheme.error,
+            ),
           );
         }
       }
@@ -228,7 +244,11 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
           // ─── Header ─────────────────────────────────
           Row(
             children: [
-              const Icon(Icons.leaderboard, color: AppTheme.secondary, size: 28),
+              const Icon(
+                Icons.leaderboard,
+                color: AppTheme.secondary,
+                size: 28,
+              ),
               const SizedBox(width: 12),
               const Text(
                 'Benchmark Evaluation',
@@ -246,7 +266,9 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                   onPressed: _showHfTokenDialog,
                   icon: Icon(
                     _hfTokenSet ? Icons.key : Icons.key_off,
-                    color: _hfTokenSet ? AppTheme.success : AppTheme.textSecondary,
+                    color: _hfTokenSet
+                        ? AppTheme.success
+                        : AppTheme.textSecondary,
                     size: 20,
                   ),
                   style: IconButton.styleFrom(
@@ -282,37 +304,74 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                   children: [
                     // Model selector
                     Expanded(
-                      flex: 2,
+                      flex: 3,
                       child: modelsAsync.when(
                         loading: () => const LinearProgressIndicator(),
                         error: (e, _) => Text('Error: $e'),
-                        data: (models) => DropdownButtonFormField<String>(
-                          value: _selectedModelId,
-                          decoration: const InputDecoration(
-                            labelText: 'Model',
-                            prefixIcon: Icon(Icons.smart_toy, size: 20),
-                          ),
-                          dropdownColor: AppTheme.surfaceVariant,
-                          items: models
-                              .map(
-                                (m) => DropdownMenuItem(
-                                  value: m.id,
-                                  child: Text(
-                                    '${m.name} (${m.modelName})',
-                                    overflow: TextOverflow.ellipsis,
+                        data: (models) {
+                          final isHfRouter = _isHuggingFaceRouterModel(models);
+                          return DropdownButtonFormField<String>(
+                            value: _selectedModelId,
+                            decoration: const InputDecoration(
+                              labelText: 'Model',
+                              prefixIcon: Icon(Icons.smart_toy, size: 20),
+                            ),
+                            dropdownColor: AppTheme.surfaceVariant,
+                            items: models
+                                .map(
+                                  (m) => DropdownMenuItem(
+                                    value: m.id,
+                                    child: Text(
+                                      '${m.name} (${m.modelName})',
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
                                   ),
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (v) {
-                            if (v != _selectedModelId) {
+                                )
+                                .toList(),
+                            onChanged: (v) {
+                              if (v == _selectedModelId) return;
+
+                              final selected = models.where((m) => m.id == v);
+                              final selectedModel = selected.isNotEmpty
+                                  ? selected.first
+                                  : null;
+                              final provider =
+                                  selectedModel?.provider
+                                      .toString()
+                                      .toLowerCase() ??
+                                  '';
+                              final baseUrl =
+                                  selectedModel?.baseUrl
+                                      .toString()
+                                      .toLowerCase() ??
+                                  '';
+                              final usesHfRouter =
+                                  provider == 'huggingface' ||
+                                  baseUrl.contains('router.huggingface.co');
+
                               setState(() {
                                 _selectedModelId = v;
                                 _selectedTasks.clear();
+                                if (usesHfRouter &&
+                                    _modelType == 'hf-multimodal') {
+                                  _modelType = 'local-chat-completions';
+                                }
                               });
-                            }
-                          },
-                        ),
+
+                              if (usesHfRouter && mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Hugging Face deployed models use API mode. '
+                                      'Backend set to Local API automatically.',
+                                    ),
+                                    backgroundColor: AppTheme.warning,
+                                  ),
+                                );
+                              }
+                            },
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -320,35 +379,58 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                     // Model type
                     Expanded(
                       flex: 2,
-                      child: DropdownButtonFormField<String>(
-                        value: _modelType,
-                        decoration: const InputDecoration(
-                          labelText: 'Backend',
-                          prefixIcon: Icon(Icons.dns, size: 20),
-                        ),
-                        dropdownColor: AppTheme.surfaceVariant,
-                        items: const [
-                          DropdownMenuItem(
-                            value: 'local-chat-completions',
-                            child: Text('Local API'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'openai-chat-completions',
-                            child: Text('OpenAI API'),
-                          ),
-                          DropdownMenuItem(
-                            value: 'hf-multimodal',
-                            child: Text('HF Multimodal'),
-                          ),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) {
-                            setState(() {
-                              _modelType = v;
-                              // Reset selected benchmarks when backend changes
-                              _selectedTasks.clear();
-                            });
-                          }
+                      child: modelsAsync.when(
+                        loading: () => const LinearProgressIndicator(),
+                        error: (e, _) => Text('Error: $e'),
+                        data: (models) {
+                          final isHfRouter = _isHuggingFaceRouterModel(models);
+
+                          return DropdownButtonFormField<String>(
+                            value: _modelType,
+                            decoration: const InputDecoration(
+                              labelText: 'Backend',
+                              prefixIcon: Icon(Icons.dns, size: 20),
+                            ),
+                            dropdownColor: AppTheme.surfaceVariant,
+                            items: [
+                              const DropdownMenuItem(
+                                value: 'local-chat-completions',
+                                child: Text('Local API (OpenAI-compatible)'),
+                              ),
+                              const DropdownMenuItem(
+                                value: 'openai-chat-completions',
+                                child: Text('OpenAI Hosted API'),
+                              ),
+                              if (!isHfRouter)
+                                const DropdownMenuItem(
+                                  value: 'hf-multimodal',
+                                  child: Text(
+                                    'HF Multimodal (Local Torch/GPU)',
+                                  ),
+                                ),
+                            ],
+                            onChanged: (v) {
+                              if (v == null) return;
+                              if (isHfRouter && v == 'hf-multimodal') {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'HF Multimodal is for local model loading only. '
+                                      'For deployed Hugging Face models, use Local API backend.',
+                                    ),
+                                    backgroundColor: AppTheme.warning,
+                                  ),
+                                );
+                                return;
+                              }
+
+                              setState(() {
+                                _modelType = v;
+                                // Reset selected benchmarks when backend changes
+                                _selectedTasks.clear();
+                              });
+                            },
+                          );
                         },
                       ),
                     ),
@@ -405,10 +487,15 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                             children: [
                               Checkbox(
                                 value: _applyChatTemplate,
-                                onChanged: (v) => setState(() => _applyChatTemplate = v ?? false),
+                                onChanged: (v) => setState(
+                                  () => _applyChatTemplate = v ?? false,
+                                ),
                                 visualDensity: VisualDensity.compact,
                               ),
-                              const Text('Apply Chat Template', style: TextStyle(fontSize: 11)),
+                              const Text(
+                                'Apply Chat Template',
+                                style: TextStyle(fontSize: 11),
+                              ),
                             ],
                           ),
                         ),
@@ -419,10 +506,15 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                             children: [
                               Checkbox(
                                 value: _fewshotAsMultiturn,
-                                onChanged: (v) => setState(() => _fewshotAsMultiturn = v ?? false),
+                                onChanged: (v) => setState(
+                                  () => _fewshotAsMultiturn = v ?? false,
+                                ),
                                 visualDensity: VisualDensity.compact,
                               ),
-                              const Text('Few-shot as Multi-turn', style: TextStyle(fontSize: 11)),
+                              const Text(
+                                'Few-shot as Multi-turn',
+                                style: TextStyle(fontSize: 11),
+                              ),
                             ],
                           ),
                         ),
@@ -776,7 +868,8 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                                 content: Text(
                                   '${task.name} requires loglikelihood scoring — '
                                   'not supported by chat completion APIs. '
-                                  'Switch to HF Multimodal backend.',
+                                  'Use HF Multimodal backend (local torch/GPU), '
+                                  'or choose generate_until tasks for API backends.',
                                 ),
                                 backgroundColor: AppTheme.warning,
                               ),
@@ -804,8 +897,8 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                           color: selected
                               ? color.withValues(alpha: 0.5)
                               : incompatible
-                                  ? AppTheme.border.withValues(alpha: 0.3)
-                                  : AppTheme.border,
+                              ? AppTheme.border.withValues(alpha: 0.3)
+                              : AppTheme.border,
                           width: selected ? 2 : 1,
                         ),
                       ),
@@ -854,8 +947,10 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                                   color: task.isGenerateUntil
                                       ? AppTheme.success.withValues(alpha: 0.15)
                                       : incompatible
-                                          ? AppTheme.error.withValues(alpha: 0.15)
-                                          : AppTheme.textSecondary.withValues(alpha: 0.1),
+                                      ? AppTheme.error.withValues(alpha: 0.15)
+                                      : AppTheme.textSecondary.withValues(
+                                          alpha: 0.1,
+                                        ),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -866,8 +961,8 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                                     color: task.isGenerateUntil
                                         ? AppTheme.success
                                         : incompatible
-                                            ? AppTheme.error
-                                            : AppTheme.textSecondary,
+                                        ? AppTheme.error
+                                        : AppTheme.textSecondary,
                                   ),
                                 ),
                               ),
@@ -876,14 +971,14 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                                 incompatible
                                     ? Icons.block
                                     : selected
-                                        ? Icons.check_circle
-                                        : Icons.circle_outlined,
+                                    ? Icons.check_circle
+                                    : Icons.circle_outlined,
                                 size: 18,
                                 color: incompatible
                                     ? AppTheme.error.withValues(alpha: 0.5)
                                     : selected
-                                        ? color
-                                        : AppTheme.textSecondary,
+                                    ? color
+                                    : AppTheme.textSecondary,
                               ),
                             ],
                           ),
@@ -901,7 +996,7 @@ class _BenchmarkScreenState extends ConsumerState<BenchmarkScreen> {
                           if (incompatible) ...[
                             const SizedBox(height: 4),
                             const Text(
-                              'Requires loglikelihood — use HF backend',
+                              'Requires loglikelihood — use HF multimodal (local torch/GPU)',
                               style: TextStyle(
                                 color: AppTheme.error,
                                 fontSize: 9,

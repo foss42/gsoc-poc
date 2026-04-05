@@ -1,8 +1,11 @@
 """FastAPI application entry point."""
 
+import os
+from pathlib import Path
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from app.database import init_db
 from app.schemas import HealthResponse
@@ -12,6 +15,10 @@ from app.routers import datasets, models, evaluations, benchmarks, settings
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup/shutdown lifecycle."""
+    # Load environment variables from project-level .env when available.
+    env_path = Path(__file__).resolve().parents[2] / ".env"
+    load_dotenv(dotenv_path=env_path, override=False)
+
     await init_db()
     # Load persisted HF token into environment on startup
     await _load_hf_token()
@@ -20,7 +27,6 @@ async def lifespan(app: FastAPI):
 
 async def _load_hf_token():
     """Read hf_token from settings DB and set os.environ."""
-    import os
     from app.database import async_session
     from app.models import Setting
     async with async_session() as session:

@@ -126,6 +126,34 @@ The backend exposes a full async REST API. Visit `http://localhost:8000/docs` to
 
 ---
 
+## Hugging Face Router (OpenAI-Compatible)
+
+The backend supports Hugging Face Router using the same chat-completions format as OpenAI:
+
+- Provider: `huggingface`
+- Base URL: `https://router.huggingface.co/v1`
+- API key: either set it in Model Config, or leave it empty and set `HF_TOKEN` in environment/settings.
+
+Python call shape (reference):
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+  base_url="https://router.huggingface.co/v1",
+  api_key="YOUR_HF_TOKEN",
+)
+
+completion = client.chat.completions.create(
+  model="google/gemma-4-31B-it:novita",
+  messages=[{"role": "user", "content": "Hello!"}],
+)
+```
+
+For multimodal calls, send OpenAI-style message content arrays (`text` + `image_url`).
+
+---
+
 ## 🗂️ Dataset Format
 
 Datasets must be uploaded as a JSON array containing objects with `input` and `expected_output` fields.

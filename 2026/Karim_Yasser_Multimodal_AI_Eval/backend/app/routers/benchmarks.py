@@ -1,7 +1,9 @@
 """Benchmark evaluation endpoints — run LM Evaluation Harness benchmarks."""
 
 import asyncio
+import importlib.util
 import json
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -81,6 +83,49 @@ async def start_benchmark(
                 f"Got: {config.model_type}"
             ),
         )
+
+    provider = (model_config.provider or "").strip().lower()
+    base_url = (model_config.base_url or "").strip().lower()
+
+    if config.model_type == "local-chat-completions" and (
+        provider == "huggingface" or "router.huggingface.co" in base_url
+    ):
+        resolved_hf_key = (model_config.api_key or "").strip() or os.getenv("HF_TOKEN", "").strip()
+        if not resolved_hf_key:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "Hugging Face Router requires an API token. Set model api_key, or configure HF_TOKEN "
+                    "via Settings -> hf_token (or environment variable)."
+                ),
+            )
+
+    if config.model_type == "hf-multimodal" and (
+        provider == "huggingface" or "router.huggingface.co" in base_url
+    ):
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "model_type 'hf-multimodal' is for local Hugging Face model loading, not deployed HF Router inference. "
+                "Use model_type 'local-chat-completions' for Hugging Face Router/OpenAI-compatible APIs."
+            ),
+        )
+
+    # Local HF multimodal models require heavyweight local ML deps.
+    if config.model_type == "hf-multimodal":
+        required = ("torch", "torchvision", "accelerate")
+        missing = [pkg for pkg in required if importlib.util.find_spec(pkg) is None]
+        if missing:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "model_type 'hf-multimodal' requires local dependencies not found in backend environment: "
+                    f"{missing}. "
+                    "Install them for local GPU-capable execution, or switch model_type "
+                    "to 'local-chat-completions' for OpenAI-compatible API endpoints "
+                    "(including Hugging Face Router)."
+                ),
+            )
 
     # Check if chat-only model types have loglikelihood tasks
     if config.model_type in CHAT_ONLY_MODEL_TYPES:

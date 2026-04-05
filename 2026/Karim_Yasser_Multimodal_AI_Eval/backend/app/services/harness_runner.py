@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import traceback
 from datetime import datetime, timezone
 
@@ -86,8 +87,19 @@ def _build_model_args_string(model_config: dict, model_type: str) -> str:
     model_name = model_config.get("model_name", "")
     base_url = model_config.get("base_url", "")
     api_key = model_config.get("api_key", "")
-    temperature = model_config.get("temperature", 0.0)
     max_tokens = model_config.get("max_tokens", 256)
+    provider = (model_config.get("provider", "") or "").strip().lower()
+
+    # Resolve API key fallback from environment for router/API models.
+    resolved_api_key = api_key
+    if not resolved_api_key:
+        if provider == "huggingface" or "router.huggingface.co" in (base_url or "").lower():
+            resolved_api_key = os.getenv("HF_TOKEN", "")
+        elif model_type in ("local-chat-completions", "openai-chat-completions", "local-completions"):
+            resolved_api_key = os.getenv("OPENAI_API_KEY", "")
+
+    if isinstance(resolved_api_key, str):
+        resolved_api_key = resolved_api_key.strip().strip('"').strip("'")
 
     if model_type in ("local-chat-completions", "local-completions"):
         parts.append(f"model={model_name}")
@@ -99,7 +111,13 @@ def _build_model_args_string(model_config: dict, model_type: str) -> str:
             parts.append(f"base_url={url}")
         parts.append("tokenized_requests=False")
         parts.append(f"num_concurrent=1")
-        parts.append(f"max_retries=3")
+        # Router providers can intermittently return 504 under benchmark load.
+        # Use more retries + longer timeout to improve stability.
+        if provider == "huggingface" or "router.huggingface.co" in (base_url or "").lower():
+            parts.append("max_retries=6")
+            parts.append("timeout=600")
+        else:
+            parts.append("max_retries=3")
         parts.append(f"max_gen_toks={max_tokens}")
         # Don't pass tokenizer for API models
         parts.append("tokenizer_backend=None")
@@ -107,6 +125,8 @@ def _build_model_args_string(model_config: dict, model_type: str) -> str:
 
     elif model_type == "openai-chat-completions":
         parts.append(f"model={model_name}")
+        if resolved_api_key:
+            parts.append(f"api_key={resolved_api_key}")
         parts.append(f"max_gen_toks={max_tokens}")
 
     elif model_type == "hf-multimodal":
@@ -131,6 +151,7 @@ def _run_evaluation_sync(
     num_fewshot: int | None,
     apply_chat_template: bool = False,
     fewshot_as_multiturn: bool = False,
+    runtime_openai_api_key: str | None = None,
 ) -> dict:
     """Synchronous wrapper around lm_eval.simple_evaluate().
 
@@ -139,27 +160,46 @@ def _run_evaluation_sync(
     """
     import lm_eval
 
+    safe_args = model_args_str
+    if "auth_token=" in safe_args:
+        left, _, _ = safe_args.partition("auth_token=")
+        safe_args = left + "auth_token=***"
+    if "api_key=" in safe_args:
+        left, _, _ = safe_args.partition("api_key=")
+        safe_args = left + "api_key=***"
+
     logger.info(
         f"Starting lm_eval.simple_evaluate() — "
-        f"model={model_type}, args={model_args_str}, "
+        f"model={model_type}, args={safe_args}, "
         f"tasks={tasks}, limit={limit}, num_fewshot={num_fewshot}, "
         f"apply_chat_template={apply_chat_template}, "
         f"fewshot_as_multiturn={fewshot_as_multiturn}"
     )
 
-    results = lm_eval.simple_evaluate(
-        model=model_type,
-        model_args=model_args_str,
-        tasks=tasks,
-        limit=limit,
-        num_fewshot=num_fewshot,
-        batch_size=1,
-        log_samples=False,
-        apply_chat_template=apply_chat_template if apply_chat_template else None,
-        fewshot_as_multiturn=fewshot_as_multiturn if fewshot_as_multiturn else None,
-        # For API models we don't need a device
-        device=None if "chat-completions" in model_type or "completions" in model_type else "cuda:0",
-    )
+    previous_openai_api_key = os.environ.get("OPENAI_API_KEY")
+    if runtime_openai_api_key:
+        os.environ["OPENAI_API_KEY"] = runtime_openai_api_key
+
+    try:
+        results = lm_eval.simple_evaluate(
+            model=model_type,
+            model_args=model_args_str,
+            tasks=tasks,
+            limit=limit,
+            num_fewshot=num_fewshot,
+            batch_size=1,
+            log_samples=False,
+            apply_chat_template=apply_chat_template if apply_chat_template else None,
+            fewshot_as_multiturn=fewshot_as_multiturn if fewshot_as_multiturn else None,
+            # For API models we don't need a device
+            device=None if "chat-completions" in model_type or "completions" in model_type else "cuda:0",
+        )
+    finally:
+        if runtime_openai_api_key:
+            if previous_openai_api_key is None:
+                os.environ.pop("OPENAI_API_KEY", None)
+            else:
+                os.environ["OPENAI_API_KEY"] = previous_openai_api_key
 
     return results
 
@@ -255,12 +295,26 @@ async def run_benchmark(run_id: str, session_factory) -> None:
             "model_name": model_config.model_name,
             "base_url": model_config.base_url,
             "api_key": model_config.api_key,
+            "provider": model_config.provider,
             "temperature": model_config.temperature,
             "max_tokens": model_config.max_tokens,
         }
 
         model_args_str = _build_model_args_string(config_dict, run.model_type)
         tasks = json.loads(run.tasks)
+
+        provider = (model_config.provider or "").strip().lower()
+        base_url = (model_config.base_url or "").strip().lower()
+        runtime_openai_api_key = None
+
+        # lm-eval LocalChatCompletion/OpenAIChatCompletion read OPENAI_API_KEY for auth headers.
+        # For HF Router in API mode, map HF token into that env var at runtime.
+        if run.model_type in ("local-chat-completions", "openai-chat-completions"):
+            explicit = (model_config.api_key or "").strip().strip('"').strip("'")
+            if provider == "huggingface" or "router.huggingface.co" in base_url:
+                runtime_openai_api_key = explicit or os.getenv("HF_TOKEN", "").strip()
+            else:
+                runtime_openai_api_key = explicit or os.getenv("OPENAI_API_KEY", "").strip()
 
         try:
             # Run the evaluation in a background thread (it's synchronous)
@@ -273,6 +327,7 @@ async def run_benchmark(run_id: str, session_factory) -> None:
                 num_fewshot=run.num_fewshot,
                 apply_chat_template=run.apply_chat_template,
                 fewshot_as_multiturn=run.fewshot_as_multiturn,
+                runtime_openai_api_key=runtime_openai_api_key,
             )
 
             if results is None:
@@ -308,11 +363,47 @@ async def run_benchmark(run_id: str, session_factory) -> None:
                 f"{len(task_results)} metric entries across {len(tasks)} tasks"
             )
 
+        except ModuleNotFoundError as e:
+            missing = str(e)
+            logger.error(f"Benchmark run {run_id} failed due to missing dependency: {missing}")
+            logger.error(traceback.format_exc())
+            run.status = "failed"
+            if "accelerate" in missing:
+                run.error_message = (
+                    "Missing Python dependency 'accelerate' required by lm-eval. "
+                    "Install backend dependencies again (pip install -r requirements.txt) "
+                    "or rebuild the backend container."
+                )
+            else:
+                run.error_message = f"Missing dependency for benchmark runtime: {missing}"[:500]
+            run.completed_at = datetime.now(timezone.utc).isoformat()
+
+        except ImportError as e:
+            msg = str(e)
+            logger.error(f"Benchmark run {run_id} failed due to import error: {msg}")
+            logger.error(traceback.format_exc())
+            run.status = "failed"
+            if "Torchvision" in msg or "torchvision" in msg:
+                run.error_message = (
+                    "Missing 'torchvision' required by local hf-multimodal runtime. "
+                    "For deployed Hugging Face Router inference, use model_type 'local-chat-completions' instead."
+                )
+            else:
+                run.error_message = f"Import error during benchmark runtime: {msg}"[:500]
+            run.completed_at = datetime.now(timezone.utc).isoformat()
+
         except Exception as e:
             logger.error(f"Benchmark run {run_id} failed: {e}")
             logger.error(traceback.format_exc())
             run.status = "failed"
-            run.error_message = str(e)[:500]
+            msg = str(e)
+            if "504" in msg or "Gateway Timeout" in msg:
+                run.error_message = (
+                    "HF Router provider timed out (504) during benchmark requests. "
+                    "Try a smaller limit, lower max tokens, a faster model/provider suffix, or rerun shortly."
+                )
+            else:
+                run.error_message = msg[:500]
             run.completed_at = datetime.now(timezone.utc).isoformat()
 
         finally:
