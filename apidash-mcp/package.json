@@ -1,0 +1,33 @@
+{
+  "name": "apidash-mcp",
+  "version": "1.0.3",
+  "description": "Standalone Model Context Protocol (MCP) server bridge for API Dash",
+  "main": "index.js",
+  "bin": {
+    "apidash-mcp": "index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foss42/poc-experiments.git"
+  },
+  "keywords": [
+    "mcp",
+    "api-dash",
+    "ai-agent",
+    "model-context-protocol",
+    "api-client"
+  ],
+  "author": "Abdelrahman El-Borgy",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/foss42/poc-experiments/issues"
+  },
+  "homepage": "https://github.com/foss42/poc-experiments/blob/main/apidash-mcp/",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ]
+}
