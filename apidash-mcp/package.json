@@ -1,0 +1,33 @@
+{
+  "name": "apidash-mcp",
+  "version": "1.0.3",
+  "description": "Standalone Model Context Protocol (MCP) server bridge for API Dash",
+  "main": "index.js",
+  "bin": {
+    "apidash-mcp": "index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AbdelrahmanELBORGY/apidash.git"
+  },
+  "keywords": [
+    "mcp",
+    "api-dash",
+    "ai-agent",
+    "model-context-protocol",
+    "api-client"
+  ],
+  "author": "Abdelrahman El-Borgy",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/AbdelrahmanELBORGY/apidash/issues"
+  },
+  "homepage": "https://github.com/AbdelrahmanELBORGY/apidash/tree/official-mcp-server#readme",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ]
+}
