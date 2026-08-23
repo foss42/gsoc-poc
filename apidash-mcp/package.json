@@ -8,7 +8,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AbdelrahmanELBORGY/apidash.git"
+    "url": "git+https://github.com/foss42/poc-experiments.git"
   },
   "keywords": [
     "mcp",
@@ -20,9 +20,9 @@
   "author": "Abdelrahman El-Borgy",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/AbdelrahmanELBORGY/apidash/issues"
+    "url": "https://github.com/foss42/poc-experiments/issues"
   },
-  "homepage": "https://github.com/AbdelrahmanELBORGY/apidash/tree/official-mcp-server#readme",
+  "homepage": "https://github.com/foss42/poc-experiments/blob/main/apidash-mcp/",
   "engines": {
     "node": ">=16.0.0"
   },
